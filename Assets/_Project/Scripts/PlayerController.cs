@@ -1,21 +1,26 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
+
 [RequireComponent (typeof (Rigidbody2D))]
-public class Controller : MonoBehaviour, InputSystem_Actions.IGravityManActions
+
+public class PlayerController : MonoBehaviour, InputSystem_Actions.IGravityManActions
 {
     private InputSystem_Actions inputActions;
 
     public float speed = 5f;
     public float jumpForce = 12f;
-	public float rayLength = 0.8f;
+	private float rayLength = 1.4f;
 
 	private Rigidbody2D rb;
     private SpriteRenderer sp;
+    private Animator animator;
 
     public LayerMask groundLayer;
     private Vector2 horizontalInput;
-    
 
+    private static readonly int IsRunningHash =
+        Animator.StringToHash("IsRunning");
 
     public void Awake()
     {
@@ -24,19 +29,47 @@ public class Controller : MonoBehaviour, InputSystem_Actions.IGravityManActions
 
 		rb = GetComponent<Rigidbody2D>();
         sp = GetComponent<SpriteRenderer>();
-	}
-    private void OnEnable() => inputActions.Enable();
-    private void OnDisable() => inputActions.Disable();
 
-    void Start()
-    {
-        
+        animator = GetComponent<Animator>();
     }
 
+    private void OnEnable() => 
+        inputActions.Enable();
+    private void OnDisable() => 
+        inputActions.Disable();
+
+    void Start() { }
+
+    void Update()
+    {
+        if (animator != null)
+        {
+            bool running = Mathf.Abs(rb.linearVelocity.x) > 0.01f;
+            animator.SetBool(IsRunningHash, running);
+        }
+
+        if (horizontalInput.x > 0.01f)
+            sp.flipX = false;
+        else if (horizontalInput.x < -0.01f)
+            sp.flipX = true;
+
+    }
     bool isGrounded()
     {
         RaycastHit2D hit = Physics2D.Raycast(transform.position, Vector2.down, rayLength, groundLayer);
         return hit.collider != null;
+    }
+
+    bool IsLevelOne()
+    {
+        int activeSceneIndex = SceneManager.GetActiveScene().buildIndex;
+        string activeSceneString = SceneManager.GetActiveScene().name;
+
+        if (activeSceneIndex == 1 || activeSceneString == "LevelOne")
+        {
+            return true;
+        }
+        return false;
     }
 
     
@@ -50,9 +83,8 @@ public class Controller : MonoBehaviour, InputSystem_Actions.IGravityManActions
 
     public void OnChangeGravity(InputAction.CallbackContext context)
     {
-        if (!context.performed || !isGrounded()) return;
+        if (!context.performed || !isGrounded() || IsLevelOne()) return;
         
-        //rb.linearVelocity = new Vector2(rb.linearVelocityX, jumpForce*Time.deltaTime);
         ChangeGravity();
     }
 
@@ -63,6 +95,8 @@ public class Controller : MonoBehaviour, InputSystem_Actions.IGravityManActions
 
     public void ChangeGravity()
     {
+        GameEvents.PlayGravityBoing();
+
         sp.flipY = !sp.flipY;
         rb.gravityScale *= -1;
         rayLength *= -1;
